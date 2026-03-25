@@ -14,6 +14,9 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,15 +27,21 @@ import senac.tsi.books.repositories.BookRepository;
 import java.net.URI;
 import java.util.List;
 
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
+
 @Tag(name="books", description = "Books route")
 @RestController
 public class BookController {
 
     private final BookRepository bookRepository;
+    private final PagedResourcesAssembler<Book> pagedResourcesAssembler;
+
 
     @Autowired
-    public BookController(BookRepository bookRepository) {
+    public BookController(BookRepository bookRepository,
+                          PagedResourcesAssembler<Book> pagedResourcesAssembler) {
         this.bookRepository = bookRepository;
+        this.pagedResourcesAssembler = pagedResourcesAssembler;
     }
 
     @Tag(name = "Get")
@@ -43,8 +52,12 @@ public class BookController {
             """)
     @GetMapping("/books")
     @ResponseStatus(HttpStatus.OK)
-    public Page<Book> getBooks(@ParameterObject Pageable pageable){
-        return bookRepository.findAll(pageable);
+    public ResponseEntity<PagedModel<EntityModel<Book>>> getBooks(@ParameterObject Pageable pageable){
+        var books = bookRepository.findAll(pageable);
+
+        PagedModel<EntityModel<Book>> pagedModelBooks = pagedResourcesAssembler.toModel(books);
+
+        return ResponseEntity.ok(pagedModelBooks);
     }
 
     @Tag(name = "Get Book by id",
@@ -58,11 +71,15 @@ public class BookController {
             @ApiResponse(responseCode = "404", description = "Book not found",
                     content = @Content) })
     @GetMapping("/books/{id}")
-    public Book getBookById(
-            @PathVariable(name = "id", required = true)
-            @NotNull @NotBlank long id){
-        return bookRepository.findById(id)
+    public EntityModel<Book> getBookById(
+            @PathVariable(name = "id") long id){
+
+        var book = bookRepository.findById(id)
                 .orElseThrow(() -> new BookNotFoundException(id));
+
+        return EntityModel.of(book,
+                linkTo(methodOn(BookController.class).getBookById(id)).withSelfRel(),
+                linkTo(methodOn(BookController.class).getBooks(Pageable.unpaged())).withRel("books"));
     }
 
     @ApiResponses(value = {
