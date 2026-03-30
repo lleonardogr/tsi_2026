@@ -20,10 +20,7 @@ out/
 .env
 *.log
 
-# Build tools (if using a multi-stage Dockerfile that installs its own)
-.mvn/
-mvnw
-mvnw.cmd
+# Build tools
 .gradle/
 gradlew
 gradlew.bat
